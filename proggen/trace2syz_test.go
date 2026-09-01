@@ -2,12 +2,13 @@ package proggen
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/RandomLemon/trace2syz/parser"
 	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/prog"
 	_ "github.com/google/syzkaller/sys"
-	"github.com/shankarapailoor/trace2syz/parser"
-	"strings"
-	"testing"
 )
 
 var (

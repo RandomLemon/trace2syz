@@ -2,9 +2,9 @@ package proggen
 
 import (
 	//"fmt"
+	"github.com/RandomLemon/trace2syz/parser"
 	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/parser"
 )
 
 func parseMemoryCall(ctx *Context) *prog.Call {

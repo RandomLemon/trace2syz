@@ -2,10 +2,11 @@ package proggen
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/RandomLemon/trace2syz/parser"
 	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/parser"
-	"strings"
 )
 
 type pair struct {
@@ -58,12 +59,16 @@ func addSocketOrPair(socketOrPairMap map[sock]string, key sock, val string, targ
 	socketOrPairMap[key] = val
 }
 
-//We unfortunately have to maintain separate maps for socketpair and socket. It seems that there are cases where
-//socketpair can have multiple variants for the same hash code but socket only has one variant. E.g.
-//socketpair$inet_tcp has the following arguments
-//      domain const[AF_INET], type const[SOCK_STREAM], proto const[0], fds ptr[out, tcp_pair]
-//and socketpair$nbd has the same first three:
-//      domain const[AF_INET], type const[SOCK_STREAM], proto const[0], fds ptr[out, nbd_sock_pair]
+// We unfortunately have to maintain separate maps for socketpair and socket. It seems that there are cases where
+// socketpair can have multiple variants for the same hash code but socket only has one variant. E.g.
+// socketpair$inet_tcp has the following arguments
+//
+//	domain const[AF_INET], type const[SOCK_STREAM], proto const[0], fds ptr[out, tcp_pair]
+//
+// and socketpair$nbd has the same first three:
+//
+//	domain const[AF_INET], type const[SOCK_STREAM], proto const[0], fds ptr[out, nbd_sock_pair]
+//
 // If we keep the variant maps the same for both calls then we may choose the variant $nbd for sockets. However,
 // such a variant doesn't exist so we should keep these variants separate.
 // However, both socket and socketpair are accessed the same way and the maps are virtually the same so this function

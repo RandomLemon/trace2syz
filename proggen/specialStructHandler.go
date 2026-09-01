@@ -1,9 +1,9 @@
 package proggen
 
 import (
+	"github.com/RandomLemon/trace2syz/parser"
 	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/parser"
 )
 
 type structHandler func(syzType *prog.StructType, traceType parser.IrType, ctx *Context) parser.IrType

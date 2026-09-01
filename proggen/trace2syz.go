@@ -3,12 +3,13 @@ package proggen
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/google/syzkaller/pkg/log"
-	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/parser"
-	"github.com/shankarapailoor/trace2syz/utils"
 	"math/rand"
 	"strings"
+
+	"github.com/RandomLemon/trace2syz/parser"
+	"github.com/RandomLemon/trace2syz/utils"
+	"github.com/google/syzkaller/pkg/log"
+	"github.com/google/syzkaller/prog"
 )
 
 type returnCache map[resourceDescription]prog.Arg

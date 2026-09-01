@@ -3,10 +3,11 @@ package parser
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+
+	"github.com/RandomLemon/trace2syz/utils"
 	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/utils"
-	"strconv"
 )
 
 type operation int
@@ -314,7 +315,7 @@ func (u *unOp) Eval(target *prog.Target) uint64 {
 	return 0
 }
 
-//String implements IrType String()
+// String implements IrType String()
 func (u *unOp) String() string {
 	return fmt.Sprintf("op1: %v operand: %v\n", u.operand, u.op)
 }

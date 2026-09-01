@@ -1,11 +1,12 @@
 package proggen
 
 import (
-	"github.com/google/syzkaller/pkg/log"
-	"github.com/google/syzkaller/prog"
-	"github.com/shankarapailoor/trace2syz/parser"
 	"strconv"
 	"strings"
+
+	"github.com/RandomLemon/trace2syz/parser"
+	"github.com/google/syzkaller/pkg/log"
+	"github.com/google/syzkaller/prog"
 )
 
 func parseInnerCall(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
