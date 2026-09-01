@@ -363,6 +363,15 @@ func (m *macroType) String() string {
 	return buf.String()
 }
 
+// evalMacroArg evaluates an IR node used inside strace macro expansions (e.g. _IOC).
+func evalMacroArg(arg IrType, target *prog.Target) uint64 {
+	e, ok := arg.(Expression)
+	if !ok {
+		log.Fatalf("macro arg is not an Expression: %T", arg)
+	}
+	return e.Eval(target)
+}
+
 // Eval implements Expression's Eval()
 func (m *macroType) Eval(target *prog.Target) uint64 {
 	switch m.MacroName {
@@ -371,6 +380,22 @@ func (m *macroType) Eval(target *prog.Target) uint64 {
 		a2 := m.Args[1].(Expression)
 		a3 := m.Args[2].(Expression)
 		return (a1.Eval(target) << 16) + (a2.Eval(target) << 8) + a3.Eval(target)
+	case "_IOC":
+		// Linux uapi/asm-generic/ioctl.h: _IOC(dir,type,nr,size)
+		if len(m.Args) != 4 {
+			log.Fatalf("_IOC expects 4 arguments, got %d", len(m.Args))
+		}
+		const (
+			iocNRShift   = 0
+			iocTypeShift = 8
+			iocSizeShift = 16
+			iocDirShift  = 30
+		)
+		dir := evalMacroArg(m.Args[0], target)
+		typ := evalMacroArg(m.Args[1], target)
+		nr := evalMacroArg(m.Args[2], target)
+		size := evalMacroArg(m.Args[3], target)
+		return (dir << iocDirShift) | (typ << iocTypeShift) | (nr << iocNRShift) | (size << iocSizeShift)
 	default:
 		log.Fatalf("Unsupported Macro: %s", m.MacroName)
 	}

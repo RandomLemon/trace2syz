@@ -174,6 +174,10 @@ var (
 		"SHUT_RDWR":                                           2,
 		"FS_IOC_GETFLAGS":                                     26113,
 		"FS_IOC_SETFLAGS":                                     26112,
+		// Linux asm-generic/ioctl.h — used inside strace's _IOC(...) expansion
+		"_IOC_NONE":  0,
+		"_IOC_WRITE": 1,
+		"_IOC_READ":  2,
 		"RTC_UIE_ON":                                          28675,
 		"RTC_UIE_OFF":                                         28674,
 		"PHN_NOT_OH":                                          28676,
