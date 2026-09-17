@@ -54,6 +54,12 @@ func parseTraces(target *prog.Target) []*proggen.Context {
 
 	totalFiles := len(names)
 	log.Logf(0, "Parsing %d traces", totalFiles)
+	// The converter writes programs into deserialized/; create it so a fresh
+	// checkout works without a manual mkdir.
+	if err := os.MkdirAll("deserialized", 0755); err != nil {
+		log.Fatalf("failed to create deserialized dir: %v", err)
+	}
+
 	for i, file := range names {
 		log.Logf(1, "Parsing File %d/%d: %s", i+1, totalFiles, filepath.Base(names[i]))
 		tree := parser.Parse(file)
