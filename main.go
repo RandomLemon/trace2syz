@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -71,15 +70,16 @@ func parseTraces(target *prog.Target) []*proggen.Context {
 				log.Logf(1, "Failed to fill out memory. Error: %s", err)
 				continue
 			}
-			if err := ctx.Prog.Validate(); err != nil {
+			p, err := proggen.ValidateProg(ctx.Prog)
+			if err != nil {
 				log.Fatalf("Error validating program: %s", err)
 			}
-			if progIsTooLarge(ctx.Prog) {
+			if progIsTooLarge(p) {
 				log.Logf(1, "Prog is too large")
 				continue
 			}
 			progName := "deserialized/" + filepath.Base(file) + strconv.Itoa(i)
-			if err := ioutil.WriteFile(progName, ctx.Prog.Serialize(), 0640); err != nil {
+			if err := os.WriteFile(progName, p.Serialize(), 0640); err != nil {
 				log.Fatalf("failed to output file: %v", err)
 			}
 		}
@@ -89,8 +89,7 @@ func parseTraces(target *prog.Target) []*proggen.Context {
 }
 
 func progIsTooLarge(p *prog.Prog) bool {
-	buff := make([]byte, prog.ExecBufferSize)
-	if _, err := p.SerializeForExec(buff); err != nil {
+	if _, err := p.SerializeForExec(); err != nil {
 		return true
 	}
 	return false
@@ -98,7 +97,7 @@ func progIsTooLarge(p *prog.Prog) bool {
 
 func getTraceFiles(dir string) []string {
 	var names []string
-	infos, err := ioutil.ReadDir(dir)
+	infos, err := os.ReadDir(dir)
 	if err != nil {
 		log.Fatalf("Failed to read dir: %s", err.Error())
 
@@ -128,19 +127,19 @@ func parseTree(tree *parser.TraceTree, pid int64, target *prog.Target) []*progge
 
 func pack(dir, file string) {
 	log.Logf(0, "Converted traces...Generating corpus.db")
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		log.Fatalf("failed to read dir: %v", err)
 	}
 	os.Remove(file)
-	syzDb, err := db.Open(file)
+	syzDb, err := db.Open(file, false)
 	if err != nil {
 		log.Fatalf("failed to open database file: %v", err)
 	}
 	syzDb.BumpVersion(currentDBVersion)
 	log.Logf(1, "Deserializing programs => deserialized/")
 	for _, file := range files {
-		data, err := ioutil.ReadFile(filepath.Join(dir, file.Name()))
+		data, err := os.ReadFile(filepath.Join(dir, file.Name()))
 		if err != nil {
 			log.Fatalf("failed to read file %v: %v", file.Name(), err)
 		}

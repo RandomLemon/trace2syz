@@ -32,7 +32,7 @@ func parseSingleTrace(t *testing.T, data string) *Context {
 	ctx = GenSyzProg(traceTree.TraceMap[traceTree.RootPid], target, variantMap)
 
 	ctx.FillOutMemory()
-	if err = ctx.Prog.Validate(); err != nil {
+	if _, err = ValidateProg(ctx.Prog); err != nil {
 		t.Fatalf("Failed to parse trace: %s", err.Error())
 	}
 	return ctx
@@ -229,7 +229,11 @@ func TestParseVariants(t *testing.T) {
 		{"mmap", "socket$inet_tcp", "ioctl$int_in"},
 		{"mmap", "socket$inet_tcp", "connect$inet"},
 		{"mmap", "socket$inet_tcp", "setsockopt$sock_int"},
-		{"mmap", "socket$packet", "ioctl$sock_SIOCGIFINDEX"},
+		// The 2018 descriptions had exactly one sock/SIOCGIFINDEX ioctl; the
+		// current tree has several sharing (resource, cmd), and the first in
+		// target.Syscalls wins. Upstream syz-trace2syz's own test expects the
+		// same variant for this exact trace.
+		{"mmap", "socket$packet", "ioctl$ifreq_SIOCGIFINDEX_batadv_hard"},
 		{"mmap", "open", "connect"},
 	}
 	for i, test := range tests {
@@ -261,7 +265,9 @@ func TestParseIPv4(t *testing.T) {
 		if !ok {
 			t.Fatalf("Expected 3rd argument to be unionArg. Got %s", sockaddr.Inner[2].Type().Name())
 		}
-		optName := ipv4Addr.Option.Type().FieldName()
+		// FieldName() lived on the old TypeCommon; the modern API keeps the
+		// per-field name on prog.Field, reachable via the union's selected index.
+		optName := ipv4Addr.Type().(*prog.UnionType).Fields[ipv4Addr.Index].Name
 		if !strings.Contains(optName, "rand") {
 			t.Fatalf("Expected ip option to be random opt. Got: %s", optName)
 		}

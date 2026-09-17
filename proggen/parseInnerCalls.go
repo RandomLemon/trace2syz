@@ -9,25 +9,25 @@ import (
 	"github.com/google/syzkaller/prog"
 )
 
-func parseInnerCall(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
+func parseInnerCall(syzType prog.Type, dir prog.Dir, traceType *parser.Call, ctx *Context) prog.Arg {
 	switch traceType.CallName {
 	case "htons":
-		return htonsHtonl(syzType, traceType, ctx)
+		return htonsHtonl(syzType, dir, traceType, ctx)
 	case "htonl":
-		return htonsHtonl(syzType, traceType, ctx)
+		return htonsHtonl(syzType, dir, traceType, ctx)
 	case "inet_addr":
-		return inetAddr(syzType, traceType, ctx)
+		return inetAddr(syzType, dir, traceType, ctx)
 	case "inet_pton":
-		return inetPton(syzType, traceType, ctx)
+		return inetPton(syzType, dir, traceType, ctx)
 	case "makedev":
-		return makedev(syzType, traceType, ctx)
+		return makedev(syzType, dir, traceType, ctx)
 	default:
 		log.Fatalf("Inner Call: %s Unsupported", traceType.CallName)
 	}
 	return nil
 }
 
-func makedev(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
+func makedev(syzType prog.Type, dir prog.Dir, traceType *parser.Call, ctx *Context) prog.Arg {
 	var major, minor, id int64
 
 	arg1 := traceType.Args[0].(parser.Expression)
@@ -37,11 +37,11 @@ func makedev(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
 
 	id = ((minor & 0xff) | ((major & 0xfff) << 8) | ((minor & ^0xff) << 12) | ((major & ^0xfff) << 32))
 
-	return prog.MakeConstArg(syzType, uint64(id))
+	return prog.MakeConstArg(syzType, dir, uint64(id))
 
 }
 
-func htonsHtonl(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
+func htonsHtonl(syzType prog.Type, dir prog.Dir, traceType *parser.Call, ctx *Context) prog.Arg {
 	if len(traceType.Args) > 1 {
 		log.Fatalf("Cannot evaluate htonsHtonl since it has more than one arg.")
 	}
@@ -51,9 +51,9 @@ func htonsHtonl(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Ar
 		case parser.Expression:
 			val := a.Eval(ctx.Target)
 			if val >= typ.ValuesPerProc {
-				return prog.MakeConstArg(syzType, typ.ValuesPerProc-1)
+				return prog.MakeConstArg(syzType, dir, typ.ValuesPerProc-1)
 			}
-			return prog.MakeConstArg(syzType, val)
+			return prog.MakeConstArg(syzType, dir, val)
 		default:
 			log.Fatalf("Expected first arg of Htons/Htonl to be expression. Got: %s", a.Name())
 		}
@@ -61,7 +61,7 @@ func htonsHtonl(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Ar
 		switch a := traceType.Args[0].(type) {
 		case parser.Expression:
 			val := a.Eval(ctx.Target)
-			return prog.MakeConstArg(syzType, val)
+			return prog.MakeConstArg(syzType, dir, val)
 		default:
 			log.Fatalf("Expected first arg of Htons/Htonl to be expression. Got: %s", a.Name())
 		}
@@ -71,7 +71,7 @@ func htonsHtonl(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Ar
 	return nil
 }
 
-func inetAddr(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
+func inetAddr(syzType prog.Type, dir prog.Dir, traceType *parser.Call, ctx *Context) prog.Arg {
 	var ip uint64
 	ip4Addr := func(ipaddr string) uint64 {
 		var (
@@ -87,7 +87,6 @@ func inetAddr(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg 
 		return ret
 	}
 	if len(traceType.Args) > 1 {
-		log.Logf(3, "%#v", traceType.Args)
 		log.Fatalf("inetAddr should only have one argument. Found: %d\n", len(traceType.Args))
 	}
 	switch a := traceType.Args[0].(type) {
@@ -98,28 +97,30 @@ func inetAddr(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg 
 	}
 	switch a := syzType.(type) {
 	case *prog.UnionType:
-		for _, field := range a.Fields {
-			if !strings.Contains(field.FieldName(), "rand") {
+		for i := range a.Fields {
+			field := a.Fields[i]
+			if !strings.Contains(field.Name, "rand") {
 				continue
 			}
-			switch field.(type) {
+			switch field.Type.(type) {
 			case *prog.IntType:
-				return prog.MakeUnionArg(syzType, prog.MakeConstArg(field, ip))
+				return prog.MakeUnionArg(syzType, dir,
+					prog.MakeConstArg(field.Type, field.Dir(dir), ip), i)
 			default:
-				log.Fatalf("Rand field isn't int type. Instead is %s", field.Name())
+				log.Fatalf("Rand field isn't int type. Instead is %s", field.Type.Name())
 			}
 		}
 	default:
 		log.Fatalf("Parsing ip address for non-union type %s", a.Name())
 	}
 	log.Logf(4, "Generating default arg for ip address")
-	return prog.DefaultArg(syzType)
+	return syzType.DefaultArg(dir)
 }
 
-func inetPton(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg {
+func inetPton(syzType prog.Type, dir prog.Dir, traceType *parser.Call, ctx *Context) prog.Arg {
 	log.Logf(4, "type name: %s", syzType.Name())
 	unionType := syzType.(*prog.UnionType)
-	var optType prog.Type
+	var optIdx int
 	var innerArg prog.Arg
 	if len(traceType.Args) != 3 {
 		log.Fatalf("InetPton expects 3 args: %v.", traceType.Args)
@@ -128,15 +129,16 @@ func inetPton(syzType prog.Type, traceType *parser.Call, ctx *Context) prog.Arg 
 	case *parser.BufferType:
 		switch a.Val {
 		case "::":
-			optType = unionType.Fields[0]
+			optIdx = 0
 		case "::1":
-			optType = unionType.Fields[3]
+			optIdx = 3
 		default:
-			optType = unionType.Fields[0]
+			optIdx = 0
 		}
-		innerArg = prog.DefaultArg(optType)
+		field := unionType.Fields[optIdx]
+		innerArg = field.Type.DefaultArg(field.Dir(dir))
 	default:
 		log.Fatalf("Parsing inet_addr and inner arg has non ipv4 type")
 	}
-	return prog.MakeUnionArg(syzType, innerArg)
+	return prog.MakeUnionArg(syzType, dir, innerArg, optIdx)
 }

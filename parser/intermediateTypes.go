@@ -148,19 +148,19 @@ func GenDefaultIrType(syzType prog.Type) IrType {
 	case *prog.StructType:
 		straceFields := make([]IrType, len(a.Fields))
 		for i := 0; i < len(straceFields); i++ {
-			straceFields[i] = GenDefaultIrType(a.Fields[i])
+			straceFields[i] = GenDefaultIrType(a.Fields[i].Type)
 		}
 		return newGroupType(straceFields)
 	case *prog.ArrayType:
 		straceFields := make([]IrType, 1)
-		straceFields[0] = GenDefaultIrType(a.Type)
+		straceFields[0] = GenDefaultIrType(a.Elem)
 		return newGroupType(straceFields)
 	case *prog.ConstType, *prog.ProcType, *prog.LenType, *prog.FlagsType, *prog.IntType:
 		return NewIntsType([]int64{0})
 	case *prog.PtrType:
-		return NewPointerType(0, GenDefaultIrType(a.Type))
+		return NewPointerType(0, GenDefaultIrType(a.Elem))
 	case *prog.UnionType:
-		return GenDefaultIrType(a.Fields[0])
+		return GenDefaultIrType(a.Fields[0].Type)
 	default:
 		log.Fatalf("Unsupported syz type for generating default strace type: %s", syzType.Name())
 	}

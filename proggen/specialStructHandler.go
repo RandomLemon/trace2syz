@@ -25,9 +25,9 @@ func bpfFramedProgramHandler(syzType *prog.StructType, traceType parser.IrType, 
 		if a.Len > 1 {
 			straceStructArgs := make([]parser.IrType, len(syzType.Fields))
 			straceStructArgs[1] = a
-			straceArg0 := parser.GenDefaultIrType(syzType.Fields[0])
+			straceArg0 := parser.GenDefaultIrType(syzType.Fields[0].Type)
 			straceStructArgs[0] = straceArg0
-			straceStructArgs = append(straceStructArgs, parser.GenDefaultIrType(syzType.Fields[1]))
+			straceStructArgs = append(straceStructArgs, parser.GenDefaultIrType(syzType.Fields[1].Type))
 			return &parser.GroupType{Elems: straceStructArgs, Len: len(straceStructArgs)}
 		}
 		log.Fatalf("Failed to parse bpfFramedProgramHandler. Strace array needs at least 2 elements")

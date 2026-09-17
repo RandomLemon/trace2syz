@@ -1,3 +1,20 @@
+> **Migrated to modern Go (2026).** This copy lives at `trace2syz/` in the
+> TensorFunnel repo and builds against the modern syzkaller at `../syzkaller`
+> (Go 1.26, module mode) instead of its old `vendor/` tree. The GOPATH
+> instructions below are kept for upstream reference and no longer apply; use:
+>
+> ```bash
+> cd trace2syz
+> make            # go build -o ./bin/trace2syz .
+> make test
+> ./bin/trace2syz -file ../data/tf4.trace
+> ```
+>
+> The syzkaller dependency is wired by a relative `replace` in `go.mod`, so the
+> module resolves from any checkout location. `make generate` regenerates the
+> ragel/goyacc parsers; they are checked in because they carry this fork's kcov
+> `"Cover:"` line handling and `_IOC` decoding.
+
 # trace2syz
 
 [![Build Status](https://travis-ci.org/shankarapailoor/trace2syz.svg?branch=master)](https://travis-ci.org/shankarapailoor/trace2syz) [![Go Report Card](https://goreportcard.com/badge/github.com/shankarapailoor/trace2syz)](https://goreportcard.com/report/github.com/shankarapailoor/trace2syz)
