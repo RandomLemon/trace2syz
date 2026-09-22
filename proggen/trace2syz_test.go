@@ -288,3 +288,69 @@ func TestParseIPv4(t *testing.T) {
 		testIpv4(expectedIps[i], p.Calls[2].Args[1], t)
 	}
 }
+
+// deviceOpenArgs returns the (id, flags) constants of the syz_open_dev call in
+// p, whose argument order is (dev, id, flags).
+func deviceOpenArgs(t *testing.T, p *prog.Prog) (int64, int64) {
+	t.Helper()
+	for _, call := range p.Calls {
+		if call.Meta.CallName != "syz_open_dev" {
+			continue
+		}
+		if len(call.Args) != 3 {
+			t.Fatalf("syz_open_dev has %d args, want 3", len(call.Args))
+		}
+		id, ok := call.Args[1].(*prog.ConstArg)
+		if !ok {
+			t.Fatalf("id argument is %T, want const", call.Args[1])
+		}
+		flags, ok := call.Args[2].(*prog.ConstArg)
+		if !ok {
+			t.Fatalf("flags argument is %T, want const", call.Args[2])
+		}
+		return int64(id.Val), int64(flags.Val)
+	}
+	t.Fatal("no syz_open_dev call in program")
+	return 0, 0
+}
+
+// TestOpenDevBinding pins that a device open becomes syz_open_dev$<dev> with the
+// device index captured from the path and the open mode in the flags slot, for
+// both open() and openat(). The open() arity matters: syz_open_dev takes
+// (dev, id, flags) while open() traces (path, flags), so a rewrite that keeps
+// the source arity puts the open mode into the id slot and leaves flags at 0,
+// which is exactly the device index the executor then opens.
+func TestOpenDevBinding(t *testing.T) {
+	tests := []struct {
+		trace    string
+		callName string
+		id       int64
+		flags    int64
+	}{
+		{`open("/dev/nvidia3", O_WRONLY) = 3`, "syz_open_dev$nvidia", 3, 1},
+		{`open("/dev/nvidia7", O_RDONLY) = 3`, "syz_open_dev$nvidia", 7, 0},
+		{`open("/dev/nvidia0", O_RDWR) = 3`, "syz_open_dev$nvidia", 0, 2},
+		{`open("/dev/nvidiactl", O_RDWR) = 3`, "syz_open_dev$nvidiactl", 0, 2},
+		{`openat(AT_FDCWD, "/dev/nvidia4", O_WRONLY) = 3`, "syz_open_dev$nvidia", 4, 1},
+		{`openat(9, "/dev/nvidiactl", O_RDONLY) = 5`, "syz_open_dev$nvidiactl", 0, 0},
+	}
+	for _, test := range tests {
+		p := parseSingleTrace(t, test.trace).Prog
+		var got string
+		for _, call := range p.Calls {
+			if call.Meta.CallName == "syz_open_dev" {
+				got = call.Meta.Name
+			}
+		}
+		if got != test.callName {
+			t.Errorf("%q: bound to %q, want %q", test.trace, got, test.callName)
+			continue
+		}
+		id, flags := deviceOpenArgs(t, p)
+		if id != test.id || flags != test.flags {
+			t.Errorf("%q: (id, flags) = (%d, %d), want (%d, %d)",
+				test.trace, id, flags, test.id, test.flags)
+		}
+	}
+}
+

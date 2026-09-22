@@ -474,6 +474,13 @@ func open(ctx *Context) {
 // selectOpenDev rebinds an open()/openat() call to the matching syz_open_dev$<dev>
 // description when the traced path names a device node the target knows about.
 // pathIdx is the index of the path argument, flagsIdx that of the flags argument.
+//
+// syz_open_dev$* takes (dev, id, flags), so the rewritten strace args must be
+// exactly those three slots whatever the shape of the source call: the traced
+// path stays in the dev slot (genPtr substitutes the description's default path
+// for it), the captured device index becomes the id, and a leading openat dirfd
+// is dropped. For open(path, flags) a two-slot rewrite would shift the flags
+// into the id slot and leave flags at 0, so the id would become the open mode.
 func selectOpenDev(ctx *Context, pathIdx, flagsIdx int) bool {
 	args := ctx.CurrentStraceCall.Args
 	if len(args) <= flagsIdx {
@@ -497,9 +504,17 @@ func selectOpenDev(ctx *Context, pathIdx, flagsIdx int) bool {
 			id = 0
 		}
 		ctx.CurrentSyzCall.Meta = meta
-		// syz_open_dev(dev, id, flags): keep the traced path, add the captured id.
-		args[pathIdx] = parser.NewIntsType([]int64{int64(id)})
-		ctx.CurrentStraceCall.Args = append(args[:pathIdx+1], args[flagsIdx])
+		// Build the three syz_open_dev(dev, id, flags) slots whatever the source
+		// arity. The dev slot stays an Expression so genPtr keeps substituting the
+		// description's device path (an earlier fix that made it the captured id
+		// for open() left id = open mode and flags = 0), the captured index is the
+		// id, and the flags argument follows — the openat dirfd is dropped rather
+		// than shifted into the id slot.
+		ctx.CurrentStraceCall.Args = []parser.IrType{
+			parser.NewIntsType([]int64{int64(id)}), // dev (genPtr -> default path)
+			parser.NewIntsType([]int64{int64(id)}), // id
+			args[flagsIdx],                         // flags
+		}
 		return true
 	}
 	return false
