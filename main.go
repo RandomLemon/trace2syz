@@ -80,13 +80,26 @@ func parseTraces(target *prog.Target) []*proggen.Context {
 			if err != nil {
 				log.Fatalf("Error validating program: %s", err)
 			}
-			if progIsTooLarge(p) {
-				log.Logf(1, "Prog is too large")
-				continue
+			chunks, err := proggen.SplitProg(p, prog.MaxCalls)
+			if err != nil {
+				log.Fatalf("Error splitting program: %s", err)
 			}
-			progName := "deserialized/" + filepath.Base(file) + strconv.Itoa(i)
-			if err := os.WriteFile(progName, p.Serialize(), 0640); err != nil {
-				log.Fatalf("failed to output file: %v", err)
+			if len(chunks) > 1 {
+				log.Logf(1, "Split %s program %d: %d calls over %d chunks (limit %d)",
+					filepath.Base(file), i, len(p.Calls), len(chunks), prog.MaxCalls)
+			}
+			for j, chunk := range chunks {
+				if progIsTooLarge(chunk) {
+					log.Logf(1, "Prog is too large")
+					continue
+				}
+				progName := "deserialized/" + filepath.Base(file) + strconv.Itoa(i)
+				if j > 0 {
+					progName += "_" + strconv.Itoa(j)
+				}
+				if err := os.WriteFile(progName, chunk.Serialize(), 0640); err != nil {
+					log.Fatalf("failed to output file: %v", err)
+				}
 			}
 		}
 
